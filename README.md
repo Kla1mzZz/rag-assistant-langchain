@@ -1,4 +1,4 @@
-# AI Assistant
+# AI Assistant with RAG
 
 An intelligent AI assistant service built with FastAPI that implements Retrieval-Augmented Generation (RAG) using LangChain, LangGraph, and Google Gemini. The service intelligently routes queries between general LLM responses and document-based RAG responses.
 
