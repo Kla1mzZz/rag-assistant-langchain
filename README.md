@@ -66,7 +66,7 @@ ai-assistant/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Kla1mzZz/rag-assistant-langchain
 cd ai-assistant
 ```
 
