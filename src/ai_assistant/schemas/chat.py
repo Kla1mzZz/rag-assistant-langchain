@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class ConversationRequest(BaseModel):
     prompt: str
+    thread_id: str
 
 
 class ConversationResponseStream(BaseModel):

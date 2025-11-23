@@ -63,7 +63,7 @@ async def node_llm_gatekeeper(state: RAGState) -> RAGState:
     if decision.content.strip() == "NO_RAG":
         state.use_rag = False
         general_response = await agent.ainvoke(
-            {"messages": state.query}, {"configurable": {"thread_id": "1"}}
+            {"messages": state.query}, {"configurable": {"thread_id": state.thread_id}}
         )
         state.answer = general_response["messages"][-1].content
     else:
@@ -88,6 +88,7 @@ async def node_optimize_query(state: RAGState) -> RAGState:
 
     return state
 
+
 async def node_retrieve(state: RAGState) -> RAGState:
     q = state.query_optimized or state.query
     docs = await rag_pipeline.retrieve(q, 2)
@@ -110,7 +111,7 @@ async def node_build_prompt(state: RAGState) -> RAGState:
 async def node_generate(state: RAGState) -> RAGState:
     try:
         response = await agent.ainvoke(
-            {"messages": state.prompt}, {"configurable": {"thread_id": "1"}}
+            {"messages": state.prompt}, {"configurable": {"thread_id": state.thread_id}}
         )
         state.answer = response["messages"][-1].content
     except Exception as e:

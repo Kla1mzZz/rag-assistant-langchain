@@ -14,7 +14,9 @@ class RAGPipeline:
         self.splitter = get_splitter()
         self.vector_store = store or get_vector_store()
 
-    async def extract_document(self, filename: str, file_path: str) -> list[Document] | None:
+    async def extract_document(
+        self, filename: str, file_path: str
+    ) -> list[Document] | None:
         try:
             if filename.endswith(".pdf"):
                 loader = PyPDFLoader(file_path)
@@ -31,7 +33,7 @@ class RAGPipeline:
 
     async def get_documents(self, limit: int = 5) -> Any:
         documents = self.vector_store._collection.get(
-            limit=limit-1,
+            limit=limit - 1,
             include=["documents", "metadatas"],
         )
 
