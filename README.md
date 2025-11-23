@@ -1,4 +1,4 @@
-# AI Assistant
+# AI Assistant with RAG
 
 An intelligent AI assistant service built with FastAPI that implements Retrieval-Augmented Generation (RAG) using LangChain, LangGraph, and Google Gemini. The service intelligently routes queries between general LLM responses and document-based RAG responses.
 
@@ -66,7 +66,7 @@ ai-assistant/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Kla1mzZz/rag-assistant-langchain
 cd ai-assistant
 ```
 
