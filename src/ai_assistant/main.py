@@ -10,6 +10,7 @@ from src.ai_assistant.core.logger import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    config.rag.create_docs_folder()
     logger.info("[LLM Service] Started")
     yield
 

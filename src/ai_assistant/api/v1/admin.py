@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Query
 
 from src.ai_assistant.rag.pipeline import RAGPipeline
+from src.ai_assistant.core.logger import logger
 from src.ai_assistant.core.config import config
 from src.ai_assistant.schemas.admin import (
     DocumentUploadResponse,
@@ -20,7 +21,8 @@ async def add_documents(file: UploadFile = File(...)):
     try:
         with open(file_path, "wb") as f:
             f.write(await file.read())
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error saving file: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save file",

@@ -27,12 +27,8 @@ class RAGConfig(BaseModel):
     chunk_size: int = 800
     chunk_overlap: int = 150
 
-    @field_validator("docs_folder", mode="before")
-    @classmethod
-    def validate_docs_folder(cls, v):
-        path = Path(v) if not isinstance(v, Path) else v
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+    def create_docs_folder(self):
+        Path(self.docs_folder).mkdir(parents=True, exist_ok=True)
 
 
 class AppConfig(BaseModel):
