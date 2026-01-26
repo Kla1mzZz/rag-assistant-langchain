@@ -5,4 +5,6 @@ chromadb/
 .venv/
 .env
 logs/
+qdrant_storage/
 docs/
+uv.lock

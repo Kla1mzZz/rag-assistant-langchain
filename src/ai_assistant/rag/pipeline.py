@@ -1,7 +1,9 @@
 import os
+from datetime import datetime, timezone
 from typing import Any
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain_core.documents import Document
+from qdrant_client.http import models
 
 from src.ai_assistant.rag.splitter import get_splitter
 from src.ai_assistant.rag.vector_store import get_vector_store
@@ -31,35 +33,75 @@ class RAGPipeline:
             logger.error(f"Error extracting document {filename}: {str(e)}")
             return None
 
-    async def get_documents(self, limit: int = 5) -> Any:
-        documents = self.vector_store._collection.get(
-            limit=limit - 1,
-            include=["documents", "metadatas"],
-        )
+    async def get_documents(self, limit: int = 5) -> list[dict[str, Any]]:
+        try:
+            records, _ = self.vector_store.client.scroll(
+                collection_name=self.vector_store.collection_name,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
 
-        return documents
+            documents = []
+            for record in records:
+                payload = record.payload or {}
+                documents.append({
+                    "id": record.id,
+                    "metadata": payload.get("metadata", {}),
+                })
+
+            return documents
+
+        except Exception as e:
+            logger.error(f"Ошибка при получении документов: {str(e)}")
+            return []
 
     async def delete_documents_by_name(self, name: str) -> bool:
-        documents = self.vector_store._collection.get(
-            where={"source": f"{config.rag.docs_folder}/{name}"},
-            include=["documents", "metadatas"],
-        )
-        if not documents["ids"]:
-            return False
-
+        file_path = f"{config.rag.docs_folder}/{name}"
         try:
-            await self.vector_store.adelete(documents["ids"])
-            os.remove(f"{config.rag.docs_folder}/{name}")
+            delete_result = self.vector_store.client.delete(
+                collection_name=self.vector_store.collection_name,
+                points_selector=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="metadata.source",
+                            match=models.MatchValue(value=file_path),
+                        )
+                    ]
+                ),
+            )
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"File {file_path} deleted from file system.")
+            else:
+                logger.warning(f"File {file_path} not found on disk, but cleanup continued.")
+
             return True
+
         except Exception as e:
-            logger.error(f"Error deleting document {name}: {str(e)}")
+            logger.error(f"Error during deletion process for {name}: {str(e)}")
             return False
 
     async def index_documents(self, docs) -> bool:
-        texts = self.splitter.split_documents(docs)
         try:
+            texts = self.splitter.split_documents(docs)
+            current_time = datetime.now(timezone.utc).isoformat()
+            
+            for chunk in texts:
+                chunk.metadata["created_at"] = current_time
+                
+                source_path = chunk.metadata.get("source")
+                if source_path and os.path.exists(source_path):
+                    file_size_bytes = os.path.getsize(source_path)
+                    file_size_kb = round(file_size_bytes / 1024, 2)
+                    chunk.metadata["file_size"] = file_size_kb
+                else:
+                    chunk.metadata["file_size"] = 0
+
             await self.vector_store.aadd_documents(texts)
             return True
+            
         except Exception as e:
             logger.error(f"Error indexing documents: {str(e)}")
             return False

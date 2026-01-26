@@ -20,8 +20,8 @@ class LLMConfig(BaseModel):
 
 
 class RAGConfig(BaseModel):
+    db_url: str = "http://localhost:6333"
     embedding_model: str = "intfloat/multilingual-e5-base"
-    persist_dir: Path = BASE_DIR / "chromadb"
     docs_folder: str = "docs"
 
     chunk_size: int = 800
