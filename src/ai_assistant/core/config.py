@@ -31,6 +31,16 @@ class RAGConfig(BaseModel):
         Path(self.docs_folder).mkdir(parents=True, exist_ok=True)
 
 
+class CacheConfig(BaseModel):
+    redis_url: str = "redis://localhost:6379/0"
+    documents_ttl_seconds: int = 300  # 5 min
+    conversation_ttl_seconds: int = 600  # 10 min
+    rag_retrieve_ttl_seconds: int = 600  # 10 min
+    optimize_query_ttl_seconds: int = 600  # 10 min
+    generate_ttl_seconds: int = 600  # 10 min
+    enabled: bool = True
+
+
 class AppConfig(BaseModel):
     title: str = "LLM Service"
     version: str = "1.0.0"
@@ -52,6 +62,7 @@ class Config(BaseSettings):
 
     llm: LLMConfig = LLMConfig()
     rag: RAGConfig = RAGConfig()
+    cache: CacheConfig = CacheConfig()
     app: AppConfig = AppConfig()
 
     class Config:

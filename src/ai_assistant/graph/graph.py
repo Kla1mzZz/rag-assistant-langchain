@@ -10,6 +10,12 @@ from src.ai_assistant.graph.state import RAGState
 from src.ai_assistant.rag import RAGPipeline
 from src.ai_assistant.core.config import config
 from src.ai_assistant.core.logger import logger
+from src.ai_assistant.core.cache import (
+    get_json,
+    set_json,
+    optimize_query_cache_key,
+    generate_cache_key,
+)
 
 
 llm = ChatGoogleGenerativeAI(
@@ -77,11 +83,20 @@ async def node_bypass_rag(state: RAGState) -> RAGState:
 
 
 async def node_optimize_query(state: RAGState) -> RAGState:
+    cache_key = optimize_query_cache_key(state.query)
+    cached = await get_json(cache_key)
+    if cached is not None:
+        state.query_optimized = cached.get("query_optimized") or state.query
+        return state
     try:
         result = await llm.ainvoke(rewrite_prompt.format(query=state.query))
         optimized = result.content.strip()
-
         state.query_optimized = optimized
+        await set_json(
+            cache_key,
+            {"query_optimized": optimized},
+            config.cache.optimize_query_ttl_seconds,
+        )
     except Exception as e:
         state.query_optimized = state.query
         logger.error(f"Query rewrite failed: {str(e)}")
@@ -107,11 +122,21 @@ async def node_build_prompt(state: RAGState) -> RAGState:
 
 
 async def node_generate(state: RAGState) -> RAGState:
+    cache_key = generate_cache_key(state.prompt)
+    cached = await get_json(cache_key)
+    if cached is not None:
+        state.answer = cached.get("answer") or ""
+        return state
     try:
         response = await agent.ainvoke(
             {"messages": state.prompt}, {"configurable": {"thread_id": state.thread_id}}
         )
         state.answer = response["messages"][-1].content
+        await set_json(
+            cache_key,
+            {"answer": state.answer},
+            config.cache.generate_ttl_seconds,
+        )
     except Exception as e:
         state.answer = f"Error generating response: {str(e)}"
         logger.error(f"Error in node_generate: {str(e)}")

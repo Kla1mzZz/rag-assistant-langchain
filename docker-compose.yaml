@@ -9,6 +9,14 @@ services:
       - QDRANT_HOST=qdrant_db
     depends_on:
       - qdrant_db
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
   qdrant_db:

@@ -3,6 +3,12 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, status, Query
 from src.ai_assistant.rag.pipeline import RAGPipeline
 from src.ai_assistant.core.logger import logger
 from src.ai_assistant.core.config import config
+from src.ai_assistant.core.cache import (
+    get_json,
+    set_json,
+    delete_documents_cache,
+    DOCUMENTS_KEY_PREFIX,
+)
 from src.ai_assistant.schemas.admin import (
     DocumentUploadResponse,
     DocumentDeleteResponse,
@@ -45,11 +51,17 @@ async def add_documents(file: UploadFile = File(...)):
             detail="Failed to index document",
         )
 
+    await delete_documents_cache()
     return DocumentUploadResponse(success=True, filename=file.filename)
 
 
 @router.get("/documents", response_model=DocumentGetResponse)
 async def get_documents(limit: int = Query(5, ge=1)):
+    cache_key = f"{DOCUMENTS_KEY_PREFIX}limit:{limit}"
+    cached = await get_json(cache_key)
+    if cached is not None:
+        return DocumentGetResponse(**cached)
+
     documents_data = await pipeline.get_documents(limit=limit)
     documents = []
 
@@ -62,7 +74,9 @@ async def get_documents(limit: int = Query(5, ge=1)):
             )
         )
 
-    return DocumentGetResponse(documents=documents)
+    response = DocumentGetResponse(documents=documents)
+    await set_json(cache_key, response.model_dump(), config.cache.documents_ttl_seconds)
+    return response
 
 
 @router.delete("/documents/{doc_name}", response_model=DocumentDeleteResponse)
@@ -75,4 +89,5 @@ async def delete_document(doc_name: str):
             detail=f"Document '{doc_name}' not found",
         )
 
+    await delete_documents_cache()
     return DocumentDeleteResponse(success=True, deleted=doc_name)

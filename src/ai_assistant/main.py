@@ -6,6 +6,7 @@ from src.ai_assistant.api.v1 import router as api_v1_router
 from src.ai_assistant.api.health import router as health_router
 from src.ai_assistant.core.config import config
 from src.ai_assistant.core.logger import logger
+from src.ai_assistant.core.cache import close_redis
 
 
 @asynccontextmanager
@@ -13,6 +14,7 @@ async def lifespan(app: FastAPI):
     config.rag.create_docs_folder()
     logger.info("[LLM Service] Started")
     yield
+    await close_redis()
 
 
 def get_app():
