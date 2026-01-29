@@ -10,7 +10,8 @@ An intelligent AI assistant service built with FastAPI that implements Retrieval
 - 🔍 **Query Optimization**: Automatically optimizes user queries for better retrieval
 - 💬 **Conversational AI**: Maintains conversation context using LangGraph agents (per `thread_id`)
 - 🚀 **FastAPI**: Modern, fast web framework with automatic API documentation
-- 🐳 **Docker & docker-compose**: Containerized deployment with embedded Qdrant vector database
+- 🐳 **Docker & docker-compose**: Containerized deployment with embedded Qdrant vector database and Redis cache
+- ⚡ **Redis cache**: Caches responses, document list, and RAG results to speed up repeated requests
 
 ## Tech Stack
 
@@ -18,8 +19,9 @@ An intelligent AI assistant service built with FastAPI that implements Retrieval
 - **LLM**: Google Gemini (via LangChain)
 - **Orchestration**: LangGraph
 - **Vector Store**: Qdrant (`langchain-qdrant` + `qdrant-client`)
-- **Embeddings**: Sentence Transformers (multilingual-e5-base)
+- **Embeddings**: Sentence Transformers (multilingual-e5-base, 768 dimensions)
 - **Document Processing**: LangChain document loaders
+- **Cache**: Redis (optional, for response and RAG caching)
 - **Python**: 3.12+
 
 ## Project Structure
@@ -116,6 +118,15 @@ RAG__DB_URL=http://qdrant_db:6333
 RAG__EMBEDDING_MODEL=intfloat/multilingual-e5-base
 RAG__CHUNK_SIZE=800
 RAG__CHUNK_OVERLAP=150
+
+# Redis cache (optional; cache is disabled without Redis)
+CACHE__ENABLED=true
+CACHE__REDIS_URL=redis://redis:6379/0
+CACHE__DOCUMENTS_TTL_SECONDS=300
+CACHE__CONVERSATION_TTL_SECONDS=600
+CACHE__RAG_RETRIEVE_TTL_SECONDS=600
+CACHE__OPTIMIZE_QUERY_TTL_SECONDS=600
+CACHE__GENERATE_TTL_SECONDS=600
 ```
 
 ## Usage
@@ -144,6 +155,7 @@ docker compose up --build
 This will start:
 - `app` service on port `8000`
 - `qdrant_db` (Qdrant) on ports `6333`/`6334` with data in `qdrant_storage/`
+- `redis` (Redis 7 Alpine) on port `6379` for caching (when `CACHE__ENABLED=true`)
 
 You can still run the app container alone if you manage Qdrant separately:
 
@@ -238,12 +250,75 @@ Check service health status.
 5. **Response Generation**: The LLM generates a response using the retrieved context
 6. **Response**: The answer and document sources are returned to the user
 
+## Redis: Caching
+
+Redis is used as an optional cache to reduce load on the LLM and Qdrant and speed up repeated requests.
+
+### What is cached
+
+| Cache type        | Key prefix       | Default TTL | Description                                      |
+|-------------------|------------------|-------------|--------------------------------------------------|
+| **Documents list**| `documents:*`    | 5 min       | Result of GET `/documents`                       |
+| **Query optimization** | `optimize_query:*` | 10 min  | RAG query rewrite (optimized query)             |
+| **RAG retrieve**  | `rag_retrieve:*` | 10 min      | Reserved for vector search result cache          |
+| **Generation response** | `generate:*` | 10 min  | LLM response for context + query                 |
+| **Conversation**  | `conversation:*` | 10 min     | Conversation cache keys                          |
+
+Keys are built from a SHA-256 hash of the normalized query/prompt text, so identical requests hit the same cache entry.
+
+### Configuration
+
+- **Enable/disable**: `CACHE__ENABLED=true|false`. If `false` or Redis is unavailable, caching is disabled and the app runs without it.
+- **URL**: `CACHE__REDIS_URL` (e.g. `redis://localhost:6379/0` or in Docker `redis://redis:6379/0`).
+- **TTL** (seconds): `CACHE__DOCUMENTS_TTL_SECONDS`, `CACHE__CONVERSATION_TTL_SECONDS`, `CACHE__RAG_RETRIEVE_TTL_SECONDS`, `CACHE__OPTIMIZE_QUERY_TTL_SECONDS`, `CACHE__GENERATE_TTL_SECONDS`.
+
+When a document is added or deleted via the API, cache invalidation runs: `documents:*` and `rag_retrieve:*` keys are cleared so the document list and search results stay up to date.
+
+## Vector Search: How It Works
+
+Document search is built on the **Qdrant** vector store and embeddings. Below is how the pipeline is composed and what benefits it provides.
+
+### Embeddings and collection
+
+- **Model**: `intfloat/multilingual-e5-base` (Sentence Transformers) — multilingual, suitable for English and other languages.
+- **Vector size**: 768 dimensions.
+- **Distance metric**: cosine similarity (`COSINE`).
+- **Qdrant collection**: `rag_store`; created automatically on first run with `VectorParams(size=768, distance=COSINE)`.
+
+Text is split into chunks (see below); each chunk is embedded and stored in Qdrant with metadata.
+
+### Chunks and metadata
+
+- **Splitter**: `RecursiveCharacterTextSplitter` with separators `["\n\n", "\n", ". ", " ", ""]`.
+- **Chunk size and overlap**: configured via `RAG__CHUNK_SIZE` and `RAG__CHUNK_OVERLAP` (defaults 1500 and 150).
+- Metadata includes: `source`, `chunk_id`, `created_at`, `file_size` (and others as needed). Documents are deleted by `metadata.source` (all points with that source are removed).
+
+Point IDs in Qdrant are deterministic UUIDs (uuid5) from `{source}_{content_hash}`, so re-indexing the same content does not create duplicates.
+
+### Retrieval pipeline
+
+1. **Base retriever**: Qdrant search in **MMR** (Max Marginal Relevance) mode:
+   - `search_type="mmr"`;
+   - `fetch_k=50` — number of candidates fetched from Qdrant;
+   - `k=20` — number returned after MMR (balance of relevance and diversity).
+2. **Reranker**: **FlashrankRerank** (contextual compression) is applied on those 20 documents. It reranks by relevance to the query and trims to top-**k** (default **k=4** in RAG).
+3. **Result**: the user gets 4 most relevant and diverse chunks, improving context quality for the LLM and reducing noise.
+
+Summary: vector search benefits in this project:
+
+- **Semantic search** by meaning, not exact keyword match.
+- **MMR** — fewer near-duplicate chunks, more diversity in context.
+- **Rerank (Flashrank)** — more accurate top results after the initial retrieval.
+- **Multilingual** — one model for multiple languages.
+- **Metadata filtering** — delete by source (`metadata.source`); filters can be extended in Qdrant as needed.
+
 ## Configuration
 
 Configuration is managed through environment variables with nested structure support:
 
 - `LLM__*`: LLM configuration (model, temperature, API key)
-- `RAG__*`: RAG pipeline configuration (embeddings, chunk size, etc.)
+- `RAG__*`: RAG pipeline configuration (embeddings, chunk size, Qdrant URL, etc.)
+- `CACHE__*`: Redis cache (enabled, URL, TTL for documents, conversations, RAG, generation)
 - `APP__*`: Application configuration (host, port, debug mode)
 
 See `src/ai_assistant/core/config.py` for all available options.
