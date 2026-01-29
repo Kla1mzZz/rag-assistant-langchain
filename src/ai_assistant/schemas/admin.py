@@ -6,12 +6,15 @@ class Document(BaseModel):
     date: str
     size: float
 
+
 class DocumentGetResponse(BaseModel):
     documents: list[Document]
+
 
 class DocumentUploadResponse(BaseModel):
     success: bool
     filename: str
+
 
 class DocumentDeleteResponse(BaseModel):
     success: bool

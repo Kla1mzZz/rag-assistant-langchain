@@ -21,8 +21,8 @@ def get_app():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.app.cors_origins,
-        allow_credentials=config.app.cors_credentials,
         allow_headers=config.app.cors_headers,
+        allow_methods=config.app.cors_methods,
     )
 
     app.include_router(api_v1_router)

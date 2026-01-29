@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -24,7 +24,7 @@ class RAGConfig(BaseModel):
     embedding_model: str = "intfloat/multilingual-e5-base"
     docs_folder: str = "docs"
 
-    chunk_size: int = 800
+    chunk_size: int = 1500
     chunk_overlap: int = 150
 
     def create_docs_folder(self):
@@ -43,6 +43,7 @@ class AppConfig(BaseModel):
 
     cors_origins: List[str] = ["*"]
     cors_headers: List[str] = ["*"]
+    cors_methods: List[str] = ["*"]
     cors_credentials: bool = True
 
 

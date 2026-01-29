@@ -7,22 +7,22 @@ from src.ai_assistant.core.logger import logger
 
 client = QdrantClient(config.rag.db_url)
 
+
 def get_vector_store() -> QdrantVectorStore:
     embeddings = get_embeddings()
     collection_name = "rag_store"
 
     collection_exists = client.collection_exists(collection_name)
-    
+
     if not collection_exists:
         client.create_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
-                size=768,
-                distance=models.Distance.COSINE
+                size=768, distance=models.Distance.COSINE
             ),
         )
         logger.info(f"Created new collection: {collection_name}")
-    
+
     try:
         return QdrantVectorStore(
             collection_name=collection_name,
@@ -34,7 +34,9 @@ def get_vector_store() -> QdrantVectorStore:
             client.delete_collection(collection_name)
             client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(size=768, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(
+                    size=768, distance=models.Distance.COSINE
+                ),
             )
             return QdrantVectorStore(
                 collection_name=collection_name,

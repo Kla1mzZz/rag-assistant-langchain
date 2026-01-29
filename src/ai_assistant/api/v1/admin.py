@@ -7,7 +7,7 @@ from src.ai_assistant.schemas.admin import (
     DocumentUploadResponse,
     DocumentDeleteResponse,
     DocumentGetResponse,
-    Document
+    Document,
 )
 
 
@@ -54,9 +54,13 @@ async def get_documents(limit: int = Query(5, ge=1)):
     documents = []
 
     for doc in documents_data:
-        documents.append(Document(source=doc['metadata'].get("source", "unknown").split("/")[-1], 
-                                  date=doc['metadata'].get("created_at", "none"),
-                                  size=doc['metadata'].get("file_size", 0.0)))
+        documents.append(
+            Document(
+                source=doc["metadata"].get("source", "unknown").split("/")[-1],
+                date=doc["metadata"].get("created_at", "none"),
+                size=doc["metadata"].get("file_size", 0.0),
+            )
+        )
 
     return DocumentGetResponse(documents=documents)
 

@@ -91,7 +91,7 @@ async def node_optimize_query(state: RAGState) -> RAGState:
 
 async def node_retrieve(state: RAGState) -> RAGState:
     q = state.query_optimized or state.query
-    docs = await rag_pipeline.retrieve(q, 2)
+    docs = await rag_pipeline.retrieve(q, 4)
     state.docs = docs
     return state
 
@@ -100,9 +100,7 @@ async def node_build_prompt(state: RAGState) -> RAGState:
     context = ""
 
     for doc in state.docs:
-        context += (
-            f"Document: {doc.metadata.get('source', 'unknown')}\n{doc.page_content}\n\n"
-        )
+        context += f"Document: {doc.metadata.get('source', 'unknown').split('/')[-1]}\n\n\n{doc.page_content}\n\n"
 
     state.prompt = rag_template.format(context=context, query=state.query)
     return state
