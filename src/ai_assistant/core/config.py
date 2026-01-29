@@ -41,6 +41,13 @@ class CacheConfig(BaseModel):
     enabled: bool = True
 
 
+class LangChainConfig(BaseModel):
+    """LangSmith / LangChain tracing (observability)."""
+    tracing_v2: bool = False
+    api_key: str = ""
+    project: str = "ai-assistant"
+
+
 class AppConfig(BaseModel):
     title: str = "LLM Service"
     version: str = "1.0.0"
@@ -63,6 +70,7 @@ class Config(BaseSettings):
     llm: LLMConfig = LLMConfig()
     rag: RAGConfig = RAGConfig()
     cache: CacheConfig = CacheConfig()
+    langchain: LangChainConfig = LangChainConfig()
     app: AppConfig = AppConfig()
 
     class Config:

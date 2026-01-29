@@ -312,6 +312,19 @@ Summary: vector search benefits in this project:
 - **Multilingual** — one model for multiple languages.
 - **Metadata filtering** — delete by source (`metadata.source`); filters can be extended in Qdrant as needed.
 
+## LangSmith monitoring
+
+[LangSmith](https://smith.langchain.com/) provides observability for LangChain/LangGraph: traces of LLM calls, RAG retrieval, and graph execution.
+
+1. Sign up at [smith.langchain.com](https://smith.langchain.com/) and create an API key.
+2. Set in `.env`:
+   - `LANGCHAIN__TRACING_V2=true` — enable tracing
+   - `LANGCHAIN__API_KEY=<your_langsmith_api_key>`
+   - `LANGCHAIN__PROJECT=ai-assistant` (or any project name in LangSmith)
+3. Start the app; traces will appear in the LangSmith project for each conversation, gatekeeper decision, RAG retrieve, and LLM generation.
+
+If `LANGCHAIN__API_KEY` is empty or `LANGCHAIN__TRACING_V2=false`, tracing is disabled and no data is sent.
+
 ## Configuration
 
 Configuration is managed through environment variables with nested structure support:
@@ -319,11 +332,23 @@ Configuration is managed through environment variables with nested structure sup
 - `LLM__*`: LLM configuration (model, temperature, API key)
 - `RAG__*`: RAG pipeline configuration (embeddings, chunk size, Qdrant URL, etc.)
 - `CACHE__*`: Redis cache (enabled, URL, TTL for documents, conversations, RAG, generation)
+- `LANGCHAIN__*`: LangSmith tracing (tracing_v2, api_key, project)
 - `APP__*`: Application configuration (host, port, debug mode)
 
 See `src/ai_assistant/core/config.py` for all available options.
 
 ## Development
+
+### Testing
+
+Install test dependencies and run tests:
+
+```bash
+uv sync --extra test
+uv run pytest tests -v
+```
+
+Tests cover configuration, cache key helpers, Pydantic schemas, the RAG splitter, and API endpoints (with mocked LLM/Qdrant). API tests use FastAPI's `TestClient` and mock `rag_graph` and `pipeline` where needed.
 
 ### Code Quality
 
